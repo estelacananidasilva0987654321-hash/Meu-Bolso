@@ -1,7 +1,7 @@
 /* Deixa o app abrir sem internet. Para publicar uma versão nova do app,
    troque o número em VERSAO (ex.: v2). Os aparelhos pegam a versão nova
    na próxima vez que abrirem o app com internet. */
-const VERSAO = 'v8';
+const VERSAO = 'v9';
 const CACHE = 'meu-bolso-' + VERSAO;
 const BASE = new URL('./', self.location.href).href;
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];

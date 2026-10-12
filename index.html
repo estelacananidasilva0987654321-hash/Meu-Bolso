@@ -587,7 +587,7 @@ let CATS=BASE_CATS,CAT_ALL=[];
 const CAT_BY={};
 function applyCats(extra){
   CATS=BASE_CATS.concat((extra||[]).filter(c=>c&&c.id&&c.name).map(c=>({id:c.id,name:c.name,short:c.name,g:c.g==='carro'?'carro':'pessoal',custom:true})));
-  CAT_ALL=CATS.concat(RCATS,[{id:'km',name:'Km rodado',short:'Km'}]);
+  CAT_ALL=CATS.concat(RCATS,[{id:'extrac',name:'Valor extra (carro)',short:'Extra'},{id:'km',name:'Km rodado',short:'Km'}]);
   Object.keys(CAT_BY).forEach(k=>{ delete CAT_BY[k]; });
   CAT_ALL.forEach(c=>{ CAT_BY[c.id]=c; });
   if(typeof document!=='undefined') CATS.filter(c=>c.custom).forEach((c,i)=>document.documentElement.style.setProperty('--c-'+c.id,PAL[i%PAL.length]));
@@ -605,12 +605,15 @@ const TRECHOS={ida_volta:{name:'Ida e volta',mult:2},ida:{name:'Só ida',mult:1}
 const EMPRESA_CONTA='Pix da empresa';
 const DEFAULT_SETTINGS={rate:1,routes:[{id:'r-curitiba',name:'Curitiba',km:62},{id:'r-pontagrossa',name:'Ponta Grossa',km:78}]};
 function kmTotal(kmIda,trecho,vezes){ return round2(kmIda*(TRECHOS[trecho]||TRECHOS.ida_volta).mult*vezes); }
+const REC_CATS=['salario','reembolso','extra','extrac'];
+const isRec=e=>!!e&&(e.tipo==='receita'||REC_CATS.indexOf(e.cat)>=0);
+const recBolso=e=>(e.cat==='reembolso'||e.cat==='extrac')?'carro':(e.cat==='salario'?'pessoal':(e.quem==='carro'?'carro':'pessoal'));
 function summarize(list){
   const o={km:0,kmValue:0,desc:0,pedRe:0,empresa:0,pessoal:0,carro:0,recP:0,recC:0,byCat:{},byForma:{},byConta:{},n:list.length};
   CATS.forEach(c=>{o.byCat[c.id]=0;});
   list.forEach(e=>{
     const t=Number(e.total)||0;
-    if(e.tipo==='receita'){ if(e.quem==='carro') o.recC+=t; else o.recP+=t; return; }
+    if(isRec(e)){ if(recBolso(e)==='carro') o.recC+=t; else o.recP+=t; return; }
     if(e.tipo==='km'){ o.km+=Number(e.km)||0; o.kmValue+=t; return; }
     const fk=e.forma||'', ck=(e.conta||'').trim();
     o.byForma[fk]=(o.byForma[fk]||0)+t;
@@ -758,7 +761,7 @@ function filteredEntries(){
 }
 const titleOf=e=>e.desc||(CAT_BY[e.cat]||{short:'Gasto'}).short;
 const quemTag=e=>{
-  if(e.tipo==='receita') return 'Recebido · bolso '+(e.quem==='carro'?'do carro':'pessoal');
+  if(isRec(e)) return 'Recebido · bolso '+(recBolso(e)==='carro'?'do carro':'pessoal');
   if(e.tipo==='km') return 'Km a receber';
   if(e.quem==='desc') return 'Descontado do km';
   if(e.quem==='emp') return 'Compra da empresa';
@@ -766,7 +769,7 @@ const quemTag=e=>{
   return 'Meu dinheiro';
 };
 const payText=e=>{
-  if(e.tipo==='receita') return '';
+  if(isRec(e)) return '';
   if(e.tipo==='km') return fmtKm(e.km)+' km';
   const f=(FORMA_BY[e.forma]||{}).name||'';
   return [f,(e.conta||'').trim()].filter(Boolean).join(' · ');
@@ -848,7 +851,7 @@ function renderHeader(){
 const MESES=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
 function plannedFor(m,list){
   if(m<todayISO().slice(0,7)) return [];
-  const done=new Set(list.filter(e=>e.tipo!=='km'&&e.tipo!=='receita').map(e=>String(e.desc||'').split(' · ')[0].trim().toLowerCase()));
+  const done=new Set(list.filter(e=>e.tipo!=='km'&&!isRec(e)).map(e=>String(e.desc||'').split(' · ')[0].trim().toLowerCase()));
   return S.settings.plan.filter(p=>(p.f==='m'||(p.f==='a'&&p.m===Number(m.slice(5)))||(p.f==='u'&&p.m===m))&&!done.has(p.name.trim().toLowerCase()));
 }
 function limAviso(sum){
@@ -890,7 +893,7 @@ function resetInv(){
   $('invTitle').textContent='Novo investimento'; $('invCancel').hidden=true;
 }
 function carryFor(m){
-  const c={p:0,c:0},first=S.entries.filter(e=>e.tipo==='receita').map(e=>String(e.date).slice(0,7)).sort()[0];
+  const c={p:0,c:0},first=S.entries.filter(e=>isRec(e)).map(e=>String(e.date).slice(0,7)).sort()[0];
   if(!first) return c;
   new Set(S.entries.map(e=>String(e.date).slice(0,7)).filter(x=>x<m&&x>=first)).forEach(x=>{ const t=summarize(monthEntries(x)); c.p+=t.recP-t.pessoal; c.c+=t.recC-t.carro; });
   return c;
@@ -915,7 +918,7 @@ function addMonths(iso,n){
 let ondeSig='';
 function renderOnde(){
   const m={};
-  S.entries.forEach(e=>{ if(e.tipo==='km'||e.tipo==='receita') return; const d=String(e.desc||''),i=d.indexOf(' · '); if(i>=0){ const w=d.slice(i+3).replace(/ \(\d+\/\d+\)$/,''); m[w]=(m[w]||0)+1; } });
+  S.entries.forEach(e=>{ if(e.tipo==='km'||isRec(e)) return; const d=String(e.desc||''),i=d.indexOf(' · '); if(i>=0){ const w=d.slice(i+3).replace(/ \(\d+\/\d+\)$/,''); m[w]=(m[w]||0)+1; } });
   const ks=Object.keys(m).sort((a,b)=>m[b]-m[a]).slice(0,60),sig=ks.join('|');
   if(sig===ondeSig) return; ondeSig=sig;
   $('ondeList').innerHTML=ks.map(k=>'<option value="'+esc(k)+'"></option>').join('');
@@ -944,7 +947,7 @@ function renderMini(){
   if(!S.ready){ box.innerHTML='<p class="empty">Carregando…</p>'; return; }
   const l=sortDesc(monthEntries(S.month)).slice(0,6);
   if(!l.length){ box.innerHTML='<p class="empty">Nenhum lançamento neste mês. O primeiro que você registrar aparece aqui.</p>'; return; }
-  box.innerHTML=l.map(e=>'<button type="button" class="mini" data-act="edit" data-id="'+esc(e.id)+'" aria-label="Editar '+esc(titleOf(e))+'"><span><strong>'+esc(titleOf(e))+'</strong><small>'+fmtDate(e.date)+' · '+esc((CAT_BY[e.cat]||{short:''}).short)+' · '+esc(quemTag(e))+'</small></span><span class="m-total'+(e.tipo==='km'||e.tipo==='receita'?' pos':'')+'">'+(e.tipo==='km'||e.tipo==='receita'?'+ ':'')+BRL.format(e.total)+'</span></button>').join('');
+  box.innerHTML=l.map(e=>'<button type="button" class="mini" data-act="edit" data-id="'+esc(e.id)+'" aria-label="Editar '+esc(titleOf(e))+'"><span><strong>'+esc(titleOf(e))+'</strong><small>'+fmtDate(e.date)+' · '+esc((CAT_BY[e.cat]||{short:''}).short)+' · '+esc(quemTag(e))+'</small></span><span class="m-total'+(e.tipo==='km'||isRec(e)?' pos':'')+'">'+(e.tipo==='km'||isRec(e)?'+ ':'')+BRL.format(e.total)+'</span></button>').join('');
 }
 
 function renderResumo(){
@@ -965,7 +968,7 @@ function renderResumo(){
 }
 
 function rowHTML(e){
-  const c=CAT_BY[e.cat]||CAT_BY.avulso, isKm=e.tipo==='km'||e.tipo==='receita';
+  const c=CAT_BY[e.cat]||CAT_BY.avulso, isKm=e.tipo==='km'||isRec(e);
   const act=S.confirmDel===e.id
     ? '<button class="btn sm danger" type="button" data-act="delyes" data-id="'+esc(e.id)+'">Excluir mesmo</button><button class="btn sm" type="button" data-act="delno">Cancelar</button>'
     : '<button class="btn sm" type="button" data-act="edit" data-id="'+esc(e.id)+'" aria-label="Editar '+esc(titleOf(e))+'">Editar</button><button class="btn sm" type="button" data-act="del" data-id="'+esc(e.id)+'" aria-label="Excluir '+esc(titleOf(e))+'">Excluir</button>';
@@ -1213,8 +1216,8 @@ function onRecCat(){ const r=CAT_BY[radio('rcat')]; if(r&&r.b) rf.bolso.value=r.
 function resetRec(){ setEditing(null); rf.date.value=todayISO(); rf.total.value=''; rf.desc.value=''; setRadio('rcat','salario'); onRecCat(); setMsg($('rMsg'),''); }
 function fillRec(e,id){
   rf.date.value=e.date; rf.total.value=fmtField(Number(e.total),2,2); rf.desc.value=e.desc||'';
-  setRadio('rcat',(e.cat==='reembolso'||e.cat==='extra')?e.cat:'salario');
-  rf.bolso.value=e.quem==='carro'?'carro':'pessoal';
+  setRadio('rcat',e.cat==='reembolso'?'reembolso':(e.cat==='extra'||e.cat==='extrac')?'extra':'salario');
+  rf.bolso.value=recBolso(e);
   updateRecUI(); setEditing(id); setMsg($('rMsg'),'');
 }
 function submitRec(ev){
@@ -1223,7 +1226,7 @@ function submitRec(ev){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){ setMsg($('rMsg'),'Informe a data.'); rf.date.focus(); return; }
   if(!(t>0)){ setMsg($('rMsg'),'Informe o valor, maior que zero.'); rf.total.focus(); return; }
   const bolso=cat==='reembolso'?'carro':cat==='salario'?'pessoal':rf.bolso.value;
-  const rec={tipo:'receita',date:date,cat:cat,desc:rf.desc.value.trim()||CAT_BY[cat].name,total:round2(t),forma:'',conta:'',quem:bolso,reemb:false,km:0,ts:Date.now()};
+  const rec={tipo:'receita',date:date,cat:(cat==='extra'&&bolso==='carro')?'extrac':cat,desc:rf.desc.value.trim()||CAT_BY[cat].name,total:round2(t),forma:'',conta:'',quem:bolso,reemb:false,km:0,ts:Date.now()};
   const editing=S.editId;
   if(editing){ const old=S.entries.find(e=>e.id===editing); if(old&&old.ts) rec.ts=old.ts; }
   if(editing) B.updateEntry(editing,rec); else B.addEntry(rec);
@@ -1241,7 +1244,7 @@ function buildXlsx(list){
   const rows1=[['Data','Tipo','Categoria','Descrição','Forma de pagamento','Conta / app','Quem pagou','Valor (R$)','Ressarcido?','Km'].map(H)];
   asc.forEach(e=>{
     const isKm=e.tipo==='km';
-    rows1.push([{v:excelSerial(e.date),s:'date'},isKm?'Km':(e.tipo==='receita'?'Recebido':'Gasto'),(CAT_BY[e.cat]||{name:e.cat}).name,e.desc||'',
+    rows1.push([{v:excelSerial(e.date),s:'date'},isKm?'Km':(isRec(e)?'Recebido':'Gasto'),(CAT_BY[e.cat]||{name:e.cat}).name,e.desc||'',
       isKm?'':((FORMA_BY[e.forma]||{}).name||''),isKm?'':(e.conta||''),isKm?'':((QUEM_BY[e.quem]||{}).label||''),
       {v:Number(e.total),s:'money'},(!isKm&&e.cat==='pedagio'&&e.quem==='meu')?(e.reemb?'Sim':'Não'):'',isKm?{v:Number(e.km),s:'qty'}:'']);
   });
@@ -1298,7 +1301,7 @@ function tsvText(list){
   const lines=[['Data','Tipo','Categoria','Descrição','Forma de pagamento','Conta / app','Quem pagou','Valor (R$)','Ressarcido?','Km'].join('\t')];
   xlsxRows(list).forEach(e=>{
     const isKm=e.tipo==='km';
-    lines.push([fmtDate(e.date),isKm?'Km':(e.tipo==='receita'?'Recebido':'Gasto'),clean((CAT_BY[e.cat]||{name:e.cat}).name),clean(e.desc),
+    lines.push([fmtDate(e.date),isKm?'Km':(isRec(e)?'Recebido':'Gasto'),clean((CAT_BY[e.cat]||{name:e.cat}).name),clean(e.desc),
       isKm?'':clean((FORMA_BY[e.forma]||{}).name||''),isKm?'':clean(e.conta),isKm?'':clean((QUEM_BY[e.quem]||{}).label||''),
       Number(e.total).toFixed(2).replace('.',','),(!isKm&&e.cat==='pedagio'&&e.quem==='meu')?(e.reemb?'Sim':'Não'):'',isKm?String(Number(e.km)).replace('.',','):''].join('\t'));
   });
@@ -1393,9 +1396,9 @@ function saveRoutes(routes,rate,msg){
 function startEdit(id){
   const e=S.entries.find(x=>x.id===id); if(!e) return;
   S.editId=null;
-  if(e.tipo==='km'){ setMode('km'); fillKm(e,id); } else if(e.tipo==='receita'){ setMode('receita'); fillRec(e,id); } else { setMode('gasto'); fillGasto(e,id); }
+  if(e.tipo==='km'){ setMode('km'); fillKm(e,id); } else if(isRec(e)){ setMode('receita'); fillRec(e,id); } else { setMode('gasto'); fillGasto(e,id); }
   setTab('lancar');
-  (e.tipo==='km'?k.date:e.tipo==='receita'?rf.date:g.date).scrollIntoView({block:'center'});
+  (e.tipo==='km'?k.date:isRec(e)?rf.date:g.date).scrollIntoView({block:'center'});
 }
 
 $('app').addEventListener('click',ev=>{
