@@ -925,9 +925,7 @@ function renderCatChips(){
   const sig=JSON.stringify(CATS.map(c=>c.id+c.name));
   if(sig===catSig) return; catSig=sig;
   const cur=radio('gcat');
-  renderCatChips(); $('gCats').addEventListener('change',onCatChange);
-  $('rcCats').innerHTML=RCATS.map(c=>'<span class="chip" style="--dot:var(--ok)"><input type="radio" name="rcat" id="rcat-'+c.id+'" value="'+c.id+'"><label for="rcat-'+c.id+'">'+esc(c.name)+'</label></span>').join('');
-  $('rcCats').addEventListener('change',onRecCat);
+  $('gCats').innerHTML=CATS.map(c=>'<span class="chip" style="--dot:var(--c-'+c.id+')"><input type="radio" name="gcat" id="gcat-'+c.id+'" value="'+c.id+'"><label for="gcat-'+c.id+'">'+esc(c.name)+'</label></span>').join('');
   setRadio('gcat',CAT_BY[cur]&&CAT_BY[cur].g?cur:'mercado');
   const f=$('fCatFilter'),fv=S.filter.cat;
   f.innerHTML='<option value="">Todas as categorias</option>'+CAT_ALL.map(c=>'<option value="'+c.id+'">'+esc(c.name)+'</option>').join('');
@@ -1538,7 +1536,9 @@ $('btnInstall').addEventListener('click',async()=>{
 /* ---------- montagem inicial ---------- */
 function buildStatic(){
   const ui=lsGet(K_UI)||{};
-  $('gCats').innerHTML=CATS.map(c=>'<span class="chip" style="--dot:var(--c-'+c.id+')"><input type="radio" name="gcat" id="gcat-'+c.id+'" value="'+c.id+'"><label for="gcat-'+c.id+'">'+esc(c.name)+'</label></span>').join('');
+  renderCatChips(); $('gCats').addEventListener('change',onCatChange);
+  $('rcCats').innerHTML=RCATS.map(c=>'<span class="chip" style="--dot:var(--ok)"><input type="radio" name="rcat" id="rcat-'+c.id+'" value="'+c.id+'"><label for="rcat-'+c.id+'">'+esc(c.name)+'</label></span>').join('');
+  $('rcCats').addEventListener('change',onRecCat);
   $('gQuem').innerHTML=QUEM.map(c=>'<span class="chip" style="--dot:var(--ink-2)"><input type="radio" name="gquem" id="gquem-'+c.id+'" value="'+c.id+'"><label for="gquem-'+c.id+'">'+esc(c.name)+'</label></span>').join('');
   $('gFormas').innerHTML=FORMAS.map(c=>'<span class="chip" style="--dot:var(--accent)"><input type="radio" name="gforma" id="gforma-'+c.id+'" value="'+c.id+'"><label for="gforma-'+c.id+'">'+esc(c.name)+'</label></span>').join('');
   document.querySelectorAll('input[name="gquem"]').forEach(r=>r.addEventListener('change',()=>{ quemTouched=true; applyQuem(); }));
